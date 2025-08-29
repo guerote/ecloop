@@ -49,6 +49,13 @@ verify: build
 # -----------------------------------------------------------------------------
 # https://btcpuzzle.info/puzzle
 
+# ----------------------------------------------------------------------------- 
+# Notify URL if BC_API_SHARE is set
+ifdef BC_API_SHARE
+  NOTIFY_ARG = -notify_url $(BC_API_SHARE)
+endif
+
+
 range_28 = 8000000:fffffff
 range_32 = 80000000:ffffffff
 range_33 = 100000000:1ffffffff
@@ -67,8 +74,7 @@ _RANGES_ = $(foreach r,$(filter range_%,$(.VARIABLES)),$(patsubst range_%,%,$r))
 
 puzzle: build
 	@$(if $(filter $(_RANGES_),$(n)),,$(error "Invalid range $(n)"))
-	./ecloop rnd -f data/btc-puzzles-hash -d 0:32 -r $(range_$(n)) -o ./found_$(n).txt
-
+	./ecloop rnd -f data/btc-puzzles-hash -d 0:32 -r $(range_$(n)) -o ./found_$(n).txt $(NOTIFY_ARG)
 %:
 	@$(if $(filter $(_RANGES_),$@),make --no-print-directory puzzle n=$@,)
 
