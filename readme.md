@@ -1,5 +1,7 @@
 This fork adds makes the program exit after a private key is found. It can also notify a given URL with the private key found by using the notify_url parameter. The data sent matches the BitcrackRandomiser notification parameters, except they are sent as POST variables rather than headers.
 
+I take no credit for any of this fantastic work, and I recommend hitting the main repository unless you need something from this one. I just need this available to me for convenience.
+
 # ecloop
 
 A high-performance, CPU-optimized tool for computing public keys on the secp256k1 elliptic curve. It includes features for searching both compressed and uncompressed public keys, with customizable search parameters. Discuss on [bitcointalk.org](https://bitcointalk.org/index.php?topic=5544649.0).
