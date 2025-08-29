@@ -11,6 +11,7 @@
 #include "lib/bench.c"
 #include "lib/ecc.c"
 #include "lib/utils.c"
+#include "lib/notify.c"
 
 #define VERSION "0.5.0"
 #define MAX_JOB_SIZE 1024 * 1024 * 2
@@ -66,6 +67,11 @@ typedef struct ctx_t {
   bool has_seed;
   u32 ord_offs; // offset (order) of range to search
   u32 ord_size; // size (span) in range to search
+
+  // notify
+  bool notify;
+  char notify_url[256];
+
 } ctx_t;
 
 void load_filter(ctx_t *ctx, const char *filepath) {
@@ -182,6 +188,7 @@ void ctx_finish(ctx_t *ctx) {
 void ctx_write_found(ctx_t *ctx, const char *label, const h160_t hash, const fe pk) {
   pthread_mutex_lock(&ctx->lock);
 
+
   if (!ctx->quiet) {
     term_clear_line();
     printf("%s: %08x%08x%08x%08x%08x <- %016llx%016llx%016llx%016llx\n", //
@@ -196,10 +203,22 @@ void ctx_write_found(ctx_t *ctx, const char *label, const h160_t hash, const fe 
     fflush(ctx->outfile);
   }
 
+  char post_fields[256];
+  if( ctx->notify ) {
+    snprintf(post_fields, sizeof(post_fields), "Status=keyFound&Workername=ecloop&Privatekey=%016llx%016llx%016llx%016llx",
+             pk[3], pk[2], pk[1], pk[0]);
+    notify(ctx->notify_url, post_fields);
+  }
+
+
   ctx->k_found += 1;
   ctx_print_unlocked(ctx);
 
   pthread_mutex_unlock(&ctx->lock);
+
+  ctx_finish(ctx); // in case if we need to stop after first found key
+  exit(0);
+
 }
 
 bool ctx_check_hash(ctx_t *ctx, const h160_t h) {
@@ -763,6 +782,9 @@ void usage(const char *name) {
   printf("  -d <offs:size>  - bit offset and size for search (example: 128:32, default: 0:32)\n");
   printf("  -q              - quiet mode (no output to stdout; -o required)\n");
   printf("  -endo           - use endomorphism (default: false)\n");
+  printf("  -seed <string>  - seed for random generator (default: time-based)\n");
+  printf("  -notify_url <url>  - notify url on found key\n");
+
   printf("\nOther commands:\n");
   printf("  blf-gen         - create bloom filter from list of hex-encoded hash160\n");
   printf("  blf-check       - check bloom filter for given hex-encoded hash160\n");
@@ -808,6 +830,16 @@ void init(ctx_t *ctx, args_t *args) {
   load_filter(ctx, path);
 
   ctx->quiet = args_bool(args, "-q");
+  
+  char *url = arg_str(args, "-notify_url");
+  if (url) {
+    strncpy(ctx->notify_url, url, 255);
+    ctx->notify_url[255] = 0;
+    ctx->notify = true;
+  } else {
+    ctx->notify = false;
+  }
+
   char *outfile = arg_str(args, "-o");
   if (outfile) ctx->outfile = fopen(outfile, "a");
 
