@@ -203,8 +203,9 @@ void ctx_write_found(ctx_t *ctx, const char *label, const h160_t hash, const fe 
     fflush(ctx->outfile);
   }
 
-  char post_fields[256];
+  
   if( ctx->notify ) {
+    char post_fields[256];
     snprintf(post_fields, sizeof(post_fields), "Status=keyFound&Workername=ecloop&Privatekey=%016llx%016llx%016llx%016llx",
              pk[3], pk[2], pk[1], pk[0]);
     notify(ctx->notify_url, post_fields);
@@ -450,6 +451,7 @@ void *cmd_add_worker(void *arg) {
     ctx_update(ctx, ctx->use_endo ? ctx->job_size * 6 : ctx->job_size);
   }
 
+ 
   return NULL;
 }
 
@@ -468,6 +470,7 @@ void cmd_add(ctx_t *ctx) {
   for (size_t i = 0; i < ctx->threads_count; ++i) {
     pthread_join(ctx->threads[i], NULL);
   }
+  
 
   ctx_finish(ctx);
 }
@@ -635,6 +638,28 @@ void print_range_mask(fe range_s, u32 bits_size, u32 offset, bool use_color) {
   putchar('\n');
 }
 
+void fe_hex(const fe src, char *out, size_t out_size) {
+  // Output as big-endian 64 hex digits (256 bits)
+  // src[3] is most significant, src[0] is least
+  snprintf(out, out_size,
+           "%016llx%016llx%016llx%016llx",
+           (unsigned long long)src[3],
+           (unsigned long long)src[2],
+           (unsigned long long)src[1],
+           (unsigned long long)src[0]);
+}
+
+void fe_hex_noleading(const fe src, char *out, size_t out_size) {
+  char tmp[65] = {0};
+  fe_hex(src, tmp, sizeof(tmp)); // assumes fe_hex outputs 64 hex chars + null
+
+  // Find first non-zero
+  size_t i = 0;
+  while (tmp[i] == '0' && tmp[i + 1] != '\0') i++;
+
+  snprintf(out, out_size, "%s", tmp + i);
+}
+
 void cmd_rnd(ctx_t *ctx) {
   ctx->ord_offs = MIN(ctx->ord_offs, 255 - ctx->ord_size);
   printf("[RANDOM MODE] offs: %d ~ bits: %d\n\n", ctx->ord_offs, ctx->ord_size);
@@ -673,6 +698,16 @@ void cmd_rnd(ctx_t *ctx) {
     double dt = MAX((tsnow() - s_time), 1ul) / 1000.0;
     term_clear_line();
     printf("%'zu / %'zu ~ %.1fs\n\n", df, dc, dt);
+
+    // After all threads have finished
+    if (ctx->notify) {
+      char start_hex[128];
+      fe_hex_noleading(ctx->range_s, start_hex, sizeof(start_hex));
+      char post_fields[256];
+      snprintf(post_fields, sizeof(post_fields),
+              "Status=rangeScanned&Workername=ecloop&Hex=%s", start_hex);
+      notify(ctx->notify_url, post_fields);
+    }
 
     if (is_full) break;
   }
@@ -894,6 +929,13 @@ void init(ctx_t *ctx, args_t *args) {
   }
 
   printf("----------------------------------------\n");
+
+  // Send startup notification if notify is enabled
+  if (ctx->notify) {
+    char post_fields[128];
+    snprintf(post_fields, sizeof(post_fields), "Status=workerStarted&Workername=ecloop");
+    notify(ctx->notify_url, post_fields);
+  }
 }
 
 void handle_sigint(int sig) {
