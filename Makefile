@@ -74,7 +74,7 @@ _RANGES_ = $(foreach r,$(filter range_%,$(.VARIABLES)),$(patsubst range_%,%,$r))
 
 puzzle: build
 	@$(if $(filter $(_RANGES_),$(n)),,$(error "Invalid range $(n)"))
-	./ecloop rnd -f data/btc-puzzles-hash -d 0:32 -r $(range_$(n)) -o ./found_$(n).txt $(NOTIFY_ARG)
+	./ecloop rnd -f data/btc-puzzles-hash -d 0:36 -r $(range_$(n)) -o ./found_$(n).txt $(NOTIFY_ARG)
 %:
 	@$(if $(filter $(_RANGES_),$@),make --no-print-directory puzzle n=$@,)
 
